@@ -234,15 +234,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const optionDiv = document.createElement('div');
     optionDiv.className = 'payment-option-form';
     
-    // Extraer datos adicionales si existen
-    const cardNumber = optionData.cardNumber || '';
-    const walletAddress = optionData.walletAddress || '';
-
     optionDiv.innerHTML = `
         <hr>
         <div class="form-group">
             <label>Método de Pago</label>
-            <select name="payment-method" class="payment-method" required onchange="toggleSpecificFields(this)">
+            <select name="payment-method" class="payment-method" required>
                 <option value="QVPay" ${optionData.method === 'QVPay' ? 'selected' : ''}>QVPay</option>
                 <option value="PayPal" ${optionData.method === 'PayPal' ? 'selected' : ''}>PayPal</option>
                 <option value="Transferencia Bancaria" ${optionData.method === 'Transferencia Bancaria' ? 'selected' : ''}>Transferencia Bancaria</option>
@@ -263,25 +259,20 @@ document.addEventListener('DOMContentLoaded', () => {
             </select>
         </div>
         <div class="form-group">
-            <label>Enlace de Pago (dejar en blanco si no aplica)</label>
+            <label>Enlace de Pago (si aplica)</label>
             <input type="url" name="payment-link" class="payment-link" value="${optionData.link || ''}">
         </div>
 
-        <!-- CAMPO ESPECÍFICO PARA TRANSFERENCIA BANCARIA -->
-        <div class="form-group specific-field bank-field" style="display: none;">
-            <label>Número de Tarjeta</label>
-            <input type="text" name="payment-card-number" class="payment-card-number" value="${cardNumber}" placeholder="Ej: 5421 1234 5678 9012">
-        </div>
-
-        <!-- CAMPO ESPECÍFICO PARA USDT -->
-        <div class="form-group specific-field usdt-field" style="display: none;">
-            <label>Dirección de Wallet (TRC-20)</label>
-            <input type="text" name="payment-wallet-address" class="payment-wallet-address" value="${walletAddress}" placeholder="Ej: TXYZopnK7wxVcGk9JZ7J8T9J2o1n3R4p5q">
+        <!-- CAMPO UNIVERSAL PARA INSTRUCCIONES DE DESTINO -->
+        <div class="form-group">
+            <label>Instrucciones de Destino</label>
+            <textarea name="payment-destination" class="payment-destination" rows="3" placeholder="Ej: Número de cuenta: 123456789. Titular: Tu Nombre. Banco: Tu Banco.">${optionData.destinationDetails || ''}</textarea>
         </div>
 
         <button type="button" class="btn-action btn-delete" onclick="this.parentElement.remove()">Eliminar Opción</button>
     `;
     container.appendChild(optionDiv);
+}
 
     // Mostrar/ocultar campos específicos al cargar
     const methodSelect = optionDiv.querySelector('.payment-method');
@@ -322,20 +313,9 @@ function toggleSpecificFields(selectElement) {
             method: form.querySelector('.payment-method').value,
             amount: parseFloat(form.querySelector('.payment-amount').value),
             currency: form.querySelector('.payment-currency').value,
-            link: form.querySelector('.payment-link').value
+            link: form.querySelector('.payment-link').value,
+            destinationDetails: form.querySelector('.payment-destination').value // <-- GUARDAR EL NUEVO CAMPO
         };
-
-        // Añadir datos específicos si existen
-        const cardNumberInput = form.querySelector('.payment-card-number');
-        if (cardNumberInput && cardNumberInput.value) {
-            option.cardNumber = cardNumberInput.value;
-        }
-
-        const walletAddressInput = form.querySelector('.payment-wallet-address');
-        if (walletAddressInput && walletAddressInput.value) {
-            option.walletAddress = walletAddressInput.value;
-        }
-
         planData.paymentOptions.push(option);
     });
 
