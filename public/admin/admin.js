@@ -138,49 +138,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function loadPlansList() {
-    fetch(`${API_URL}/admin/plans`).then(res => res.json()).then(plans => {
-        const container = document.getElementById('plans-list-container');
-        container.innerHTML = ''; // Limpiar contenido anterior
-
-        if (plans.length === 0) { 
-            container.innerHTML = '<p>No hay planes creados.</p>'; 
-            return; 
-        }
-
-        let listElement = document.createElement('ul');
-        listElement.className = 'dynamic-list';
-
-        plans.forEach(plan => {
-            let listItem = document.createElement('li');
-            
-            let infoDiv = document.createElement('div');
-            infoDiv.innerHTML = `<strong>${plan.name}</strong> - ${plan.description || 'Sin descripción'}<br><small>${plan.paymentOptions.length} método(s) de pago</small>`;
-            
-            let actionsDiv = document.createElement('div');
-            
-            let editButton = document.createElement('button');
-            editButton.className = 'btn-action';
-            editButton.textContent = 'Editar';
-            editButton.dataset.planId = plan.id; // Usamos un data-attribute
-            editButton.addEventListener('click', () => showPlanForm(plan.id));
-
-            let deleteButton = document.createElement('button');
-            deleteButton.className = 'btn-action btn-delete';
-            deleteButton.textContent = 'Eliminar';
-            deleteButton.dataset.planId = plan.id; // Usamos un data-attribute
-            deleteButton.addEventListener('click', () => handleDeletePlan(plan.id));
-
-            actionsDiv.appendChild(editButton);
-            actionsDiv.appendChild(deleteButton);
-            
-            listItem.appendChild(infoDiv);
-            listItem.appendChild(actionsDiv);
-            listElement.appendChild(listItem);
+        fetch(`${API_URL}/admin/plans`).then(res => res.json()).then(plans => {
+            const container = document.getElementById('plans-list-container');
+            container.innerHTML = ''; // Limpiar contenido anterior
+            if (plans.length === 0) { container.innerHTML = '<p>No hay planes creados.</p>'; return; }
+            let listElement = document.createElement('ul');
+            listElement.className = 'dynamic-list';
+            plans.forEach(plan => {
+                let listItem = document.createElement('li');
+                let infoDiv = document.createElement('div');
+                infoDiv.innerHTML = `<strong>${plan.name}</strong> - ${plan.description || 'Sin descripción'}<br><small>${plan.paymentOptions.length} método(s) de pago</small>`;
+                let actionsDiv = document.createElement('div');
+                let editButton = document.createElement('button');
+                editButton.className = 'btn-action';
+                editButton.textContent = 'Editar';
+                editButton.dataset.planId = plan.id;
+                editButton.addEventListener('click', () => showPlanForm(plan.id));
+                let deleteButton = document.createElement('button');
+                deleteButton.className = 'btn-action btn-delete';
+                deleteButton.textContent = 'Eliminar';
+                deleteButton.dataset.planId = plan.id;
+                deleteButton.addEventListener('click', () => handleDeletePlan(plan.id));
+                actionsDiv.appendChild(editButton);
+                actionsDiv.appendChild(deleteButton);
+                listItem.appendChild(infoDiv);
+                listItem.appendChild(actionsDiv);
+                listElement.appendChild(listItem);
+            });
+            container.appendChild(listElement);
         });
-
-        container.appendChild(listElement);
-    });
-}
+    }
     
     function showPlanForm(planId = null) {
         const isEditing = planId !== null;
@@ -230,113 +217,91 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function addPaymentOptionField(optionData = {}) {
-    const container = document.getElementById('payment-options-container');
-    const optionDiv = document.createElement('div');
-    optionDiv.className = 'payment-option-form';
-    
-    optionDiv.innerHTML = `
-        <hr>
-        <div class="form-group">
-            <label>Método de Pago</label>
-            <select name="payment-method" class="payment-method" required>
-                <option value="QVPay" ${optionData.method === 'QVPay' ? 'selected' : ''}>QVPay</option>
-                <option value="PayPal" ${optionData.method === 'PayPal' ? 'selected' : ''}>PayPal</option>
-                <option value="Transferencia Bancaria" ${optionData.method === 'Transferencia Bancaria' ? 'selected' : ''}>Transferencia Bancaria</option>
-                <option value="Zelle" ${optionData.method === 'Zelle' ? 'selected' : ''}>Zelle</option>
-                <option value="USDT" ${optionData.method === 'USDT' ? 'selected' : ''}>USDT (TRC-20)</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label>Monto</label>
-            <input type="number" name="payment-amount" class="payment-amount" value="${optionData.amount || ''}" required>
-        </div>
-        <div class="form-group">
-            <label>Moneda</label>
-            <select name="payment-currency" class="payment-currency" required>
-                <option value="CUP" ${optionData.currency === 'CUP' ? 'selected' : ''}>CUP</option>
-                <option value="USD" ${optionData.currency === 'USD' ? 'selected' : ''}>USD</option>
-                <option value="USDT" ${optionData.currency === 'USDT' ? 'selected' : ''}>USDT</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label>Enlace de Pago (si aplica)</label>
-            <input type="url" name="payment-link" class="payment-link" value="${optionData.link || ''}">
-        </div>
+        const container = document.getElementById('payment-options-container');
+        const optionDiv = document.createElement('div');
+        optionDiv.className = 'payment-option-form';
+        
+        optionDiv.innerHTML = `
+            <hr>
+            <div class="form-group">
+                <label>Método de Pago</label>
+                <select name="payment-method" class="payment-method" required>
+                    <option value="QVPay" ${optionData.method === 'QVPay' ? 'selected' : ''}>QVPay</option>
+                    <option value="PayPal" ${optionData.method === 'PayPal' ? 'selected' : ''}>PayPal</option>
+                    <option value="Transferencia Bancaria" ${optionData.method === 'Transferencia Bancaria' ? 'selected' : ''}>Transferencia Bancaria</option>
+                    <option value="Zelle" ${optionData.method === 'Zelle' ? 'selected' : ''}>Zelle</option>
+                    <option value="USDT" ${optionData.method === 'USDT' ? 'selected' : ''}>USDT (TRC-20)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Monto</label>
+                <input type="number" name="payment-amount" class="payment-amount" value="${optionData.amount || ''}" required>
+            </div>
+            <div class="form-group">
+                <label>Moneda</label>
+                <select name="payment-currency" class="payment-currency" required>
+                    <option value="CUP" ${optionData.currency === 'CUP' ? 'selected' : ''}>CUP</option>
+                    <option value="USD" ${optionData.currency === 'USD' ? 'selected' : ''}>USD</option>
+                    <option value="USDT" ${optionData.currency === 'USDT' ? 'selected' : ''}>USDT</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Enlace de Pago (si aplica)</label>
+                <input type="url" name="payment-link" class="payment-link" value="${optionData.link || ''}">
+            </div>
 
-        <!-- CAMPO UNIVERSAL PARA INSTRUCCIONES DE DESTINO -->
-        <div class="form-group">
-            <label>Instrucciones de Destino</label>
-            <textarea name="payment-destination" class="payment-destination" rows="3" placeholder="Ej: Número de cuenta: 123456789. Titular: Tu Nombre. Banco: Tu Banco.">${optionData.destinationDetails || ''}</textarea>
-        </div>
+            <!-- CAMPO UNIVERSAL PARA INSTRUCCIONES DE DESTINO -->
+            <div class="form-group">
+                <label>Instrucciones de Destino</label>
+                <textarea name="payment-destination" class="payment-destination" rows="3" placeholder="Ej: Número de cuenta: 123456789. Titular: Tu Nombre. Banco: Tu Banco.">${optionData.destinationDetails || ''}</textarea>
+            </div>
 
-        <button type="button" class="btn-action btn-delete" onclick="this.parentElement.remove()">Eliminar Opción</button>
-    `;
-    container.appendChild(optionDiv);
-}
-
-    // Mostrar/ocultar campos específicos al cargar
-    const methodSelect = optionDiv.querySelector('.payment-method');
-    toggleSpecificFields(methodSelect);
-}
-
-// Función para mostrar u ocultar los campos específicos
-function toggleSpecificFields(selectElement) {
-    const form = selectElement.closest('.payment-option-form');
-    const bankField = form.querySelector('.bank-field');
-    const usdtField = form.querySelector('.usdt-field');
-
-    // Ocultar todos primero
-    bankField.style.display = 'none';
-    usdtField.style.display = 'none';
-
-    // Mostrar el campo correspondiente
-    if (selectElement.value === 'Transferencia Bancaria') {
-        bankField.style.display = 'block';
-    } else if (selectElement.value === 'USDT') {
-        usdtField.style.display = 'block';
+            <button type="button" class="btn-action btn-delete" onclick="this.parentElement.remove()">Eliminar Opción</button>
+        `;
+        container.appendChild(optionDiv);
     }
-}
+
     function handlePlanSubmit(e) {
-    e.preventDefault();
-    const planId = document.getElementById('plan-id').value;
-    const isEditing = planId !== '';
-    
-    const planData = {
-        name: document.getElementById('plan-name').value,
-        description: document.getElementById('plan-description').value,
-        paymentOptions: []
-    };
-
-    const paymentOptionsForms = document.querySelectorAll('.payment-option-form');
-    paymentOptionsForms.forEach(form => {
-        const option = {
-            method: form.querySelector('.payment-method').value,
-            amount: parseFloat(form.querySelector('.payment-amount').value),
-            currency: form.querySelector('.payment-currency').value,
-            link: form.querySelector('.payment-link').value,
-            destinationDetails: form.querySelector('.payment-destination').value // <-- GUARDAR EL NUEVO CAMPO
+        e.preventDefault();
+        const planId = document.getElementById('plan-id').value;
+        const isEditing = planId !== '';
+        
+        const planData = {
+            name: document.getElementById('plan-name').value,
+            description: document.getElementById('plan-description').value,
+            paymentOptions: []
         };
-        planData.paymentOptions.push(option);
-    });
 
-    const url = isEditing ? `${API_URL}/admin/plans/${planId}` : `${API_URL}/admin/plans`;
-    const method = isEditing ? 'PUT' : 'POST';
+        const paymentOptionsForms = document.querySelectorAll('.payment-option-form');
+        paymentOptionsForms.forEach(form => {
+            const option = {
+                method: form.querySelector('.payment-method').value,
+                amount: parseFloat(form.querySelector('.payment-amount').value),
+                currency: form.querySelector('.payment-currency').value,
+                link: form.querySelector('.payment-link').value,
+                destinationDetails: form.querySelector('.payment-destination').value
+            };
+            planData.paymentOptions.push(option);
+        });
 
-    fetch(url, {
-        method: method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(planData)
-    })
-    .then(res => res.json())
-    .then(data => {
-        alert(isEditing ? 'Plan actualizado con éxito.' : 'Plan creado con éxito.');
-        loadPlansList();
-    })
-    .catch(error => {
-        console.error('Error al guardar el plan:', error);
-        alert('Hubo un error al guardar el plan.');
-    });
-}
+        const url = isEditing ? `${API_URL}/admin/plans/${planId}` : `${API_URL}/admin/plans`;
+        const method = isEditing ? 'PUT' : 'POST';
+
+        fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(planData)
+        })
+        .then(res => res.json())
+        .then(data => {
+            alert(isEditing ? 'Plan actualizado con éxito.' : 'Plan creado con éxito.');
+            loadPlansList();
+        })
+        .catch(error => {
+            console.error('Error al guardar el plan:', error);
+            alert('Hubo un error al guardar el plan.');
+        });
+    }
 
     function handleDeletePlan(planId) {
         if (!confirm('¿Estás seguro de que quieres eliminar este plan?')) return;
