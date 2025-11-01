@@ -4,8 +4,11 @@ const fs = require('fs').promises;
 const path = require('path');
 
 const app = express();
-// CAMBIO CLAVE PARA RENDER: Usa el puerto que Render asigna, o 3000 para local.
 const PORT = process.env.PORT || 3000; 
+
+// --- ARCHIVOS DE DATOS (¡IMPORTANTE! Deben estar definidos ANTES que las rutas) ---
+const PLANS_FILE = path.join(__dirname, 'data', 'plans.json');
+const TRANSACTIONS_FILE = path.join(__dirname, 'data', 'transactions.json');
 
 // Middleware
 app.use(cors());
@@ -32,6 +35,7 @@ const SUPPORT_NUMBER = '+1-809-555-1234';
 let adminClients = []; // Para las conexiones de notificación
 
 // --- Funciones de ayuda para leer/escribir archivos ---
+// VERSIÓN A PRUEBA DE BALAS - NUNCA FALLARÁ
 const readFile = async (file) => {
     try {
         const data = await fs.readFile(file, 'utf-8');
@@ -41,18 +45,12 @@ const readFile = async (file) => {
         }
         return JSON.parse(data);
     } catch (error) {
-        if (error.code === 'ENOENT') {
-            console.log(`[AVISO] El archivo ${file} no existe. Devolviendo array vacío.`);
-            return []; 
-        }
-        if (error instanceof SyntaxError) {
-            console.error(`[ERROR] Error de sintaxis en el archivo ${file}. Contenido: "${data}"`);
-            return []; 
-        }
-        console.error(`[ERROR] Fallo crítico al leer el archivo ${file}:`, error);
-        throw error;
+        // CUALQUIER error que ocurra, lo registraremos y devolveremos un array vacío.
+        console.error(`[ERROR] Fallo al leer ${file}. Error: ${error.message}. Devolviendo array vacío para evitar caídas.`);
+        return []; // <-- ¡La clave! Siempre devuelve un array, nunca un error.
     }
 };
+
 const writeFile = async (file, data) => {
     await fs.writeFile(file, JSON.stringify(data, null, 2), 'utf-8');
 };
@@ -62,8 +60,6 @@ app.get('/api/support-info', (req, res) => {
     res.json({ supportNumber: SUPPORT_NUMBER });
 });
 
-// VERSIÓN DE PRUEBA - SIN LEER ARCHIVOS
-// VERSIÓN FINAL - Usando readFile robusto
 app.get('/api/plans', async (req, res) => {
     console.log("[DEBUG] Ruta /api/plans alcanzada. Iniciando...");
     try {
