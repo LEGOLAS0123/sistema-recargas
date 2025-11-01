@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración</title>
+    <link rel="stylesheet" href="admin-style.css">
+</head>
+<body>
+    <div class="admin-container">
+        <header>
+            <h1>Panel de Administración</h1>
+            <div>
+                <span id="notification-badge" style="display:none; background:red; color:white; padding: 2px 8px; border-radius: 12px; margin-right: 10px;">¡Nuevo!</span>
+                <button id="btn-logout" style="display:none; width:auto; background:var(--danger-color);">Cerrar Sesión</button>
+            </div>
+        </header>
+        <main id="main-content"></main>
+    </div>
+    <script src="admin.js"></script>
+</body>
+</html>
