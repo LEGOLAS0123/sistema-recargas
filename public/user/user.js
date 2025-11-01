@@ -91,26 +91,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showInstructionsView(paymentOption) {
-        mainContent.innerHTML = `
-            <h2>Instrucciones de Pago</h2>
-            <p><strong>Método:</strong> ${paymentOption.method}</p>
-            <p><strong>Monto:</strong> ${paymentOption.amount} ${paymentOption.currency}</p>
-            ${paymentOption.link ? `<p><strong>Enlace:</strong> <a href="${paymentOption.link}" target="_blank">${paymentOption.link}</a></p>` : ''}
-            <p>Realiza el pago y pega el comprobante.</p>
-            <div class="form-group">
-                <label for="proof-text">Comprobante de Pago:</label>
-                <textarea id="proof-text" rows="4" placeholder="Pega aquí el mensaje de confirmación..."></textarea>
-            </div>
-            <div class="form-group">
-                <label for="phone-number">Tu Número de Teléfono:</label>
-                <input type="tel" id="phone-number" placeholder="Ej: 809-555-1234" required>
-            </div>
-            <button id="btn-submit-proof">Enviar Comprobante</button>
-            <button id="btn-back-to-methods">Volver</button>
-        `;
-        document.getElementById('btn-submit-proof').addEventListener('click', () => handleSubmitProof(paymentOption));
-        document.getElementById('btn-back-to-methods').addEventListener('click', loadPaymentMethodsView);
+    let specificInstructions = '';
+
+    // Añadir instrucciones específicas si existen
+    if (paymentOption.method === 'Transferencia Bancaria' && paymentOption.cardNumber) {
+        specificInstructions = `<p><strong>Número de Tarjeta a transferir:</strong> ${paymentOption.cardNumber}</p>`;
+    } else if (paymentOption.method === 'USDT' && paymentOption.walletAddress) {
+        specificInstructions = `<p><strong>Dirección de Wallet (TRC-20):</strong> <code>${paymentOption.walletAddress}</code></p>`;
     }
+
+    mainContent.innerHTML = `
+        <h2>Instrucciones de Pago</h2>
+        <p><strong>Método:</strong> ${paymentOption.method}</p>
+        <p><strong>Monto:</strong> ${paymentOption.amount} ${paymentOption.currency}</p>
+        ${paymentOption.link ? `<p><strong>Enlace:</strong> <a href="${paymentOption.link}" target="_blank">${paymentOption.link}</a></p>` : ''}
+        ${specificInstructions}
+        <p>Realiza el pago y pega el comprobante.</p>
+        <div class="form-group">
+            <label for="proof-text">Comprobante de Pago:</label>
+            <textarea id="proof-text" rows="4" placeholder="Pega aquí el mensaje de confirmación..."></textarea>
+        </div>
+        <div class="form-group">
+            <label for="phone-number">Tu Número de Teléfono:</label>
+            <input type="tel" id="phone-number" placeholder="Ej: 809-555-1234" required>
+        </div>
+        <button id="btn-submit-proof">Enviar Comprobante</button>
+        <button id="btn-back-to-methods">Volver</button>
+    `;
+    document.getElementById('btn-submit-proof').addEventListener('click', () => handleSubmitProof(paymentOption));
+    document.getElementById('btn-back-to-methods').addEventListener('click', loadPaymentMethodsView);
+}
 
     function handleSubmitProof(paymentOption) {
         const proofText = document.getElementById('proof-text').value;

@@ -230,80 +230,133 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function addPaymentOptionField(optionData = {}) {
-        const container = document.getElementById('payment-options-container');
-        const optionDiv = document.createElement('div');
-        optionDiv.className = 'payment-option-form';
-        optionDiv.innerHTML = `
-            <hr>
-            <div class="form-group">
-                <label>Método de Pago</label>
-                <select name="payment-method" class="payment-method" required>
-                    <option value="QVPay" ${optionData.method === 'QVPay' ? 'selected' : ''}>QVPay</option>
-                    <option value="PayPal" ${optionData.method === 'PayPal' ? 'selected' : ''}>PayPal</option>
-                    <option value="Transferencia Bancaria" ${optionData.method === 'Transferencia Bancaria' ? 'selected' : ''}>Transferencia Bancaria</option>
-                    <option value="Zelle" ${optionData.method === 'Zelle' ? 'selected' : ''}>Zelle</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Monto</label>
-                <input type="number" name="payment-amount" class="payment-amount" value="${optionData.amount || ''}" required>
-            </div>
-            <div class="form-group">
-                <label>Moneda</label>
-                <select name="payment-currency" class="payment-currency" required>
-                    <option value="CUP" ${optionData.currency === 'CUP' ? 'selected' : ''}>CUP</option>
-                    <option value="USD" ${optionData.currency === 'USD' ? 'selected' : ''}>USD</option>
-                    <option value="USDT" ${optionData.currency === 'USDT' ? 'selected' : ''}>USDT</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Enlace de Pago (dejar en blanco si no aplica)</label>
-                <input type="url" name="payment-link" class="payment-link" value="${optionData.link || ''}">
-            </div>
-            <button type="button" class="btn-action btn-delete" onclick="this.parentElement.remove()">Eliminar Opción</button>
-        `;
-        container.appendChild(optionDiv);
-    }
+    const container = document.getElementById('payment-options-container');
+    const optionDiv = document.createElement('div');
+    optionDiv.className = 'payment-option-form';
+    
+    // Extraer datos adicionales si existen
+    const cardNumber = optionData.cardNumber || '';
+    const walletAddress = optionData.walletAddress || '';
 
+    optionDiv.innerHTML = `
+        <hr>
+        <div class="form-group">
+            <label>Método de Pago</label>
+            <select name="payment-method" class="payment-method" required onchange="toggleSpecificFields(this)">
+                <option value="QVPay" ${optionData.method === 'QVPay' ? 'selected' : ''}>QVPay</option>
+                <option value="PayPal" ${optionData.method === 'PayPal' ? 'selected' : ''}>PayPal</option>
+                <option value="Transferencia Bancaria" ${optionData.method === 'Transferencia Bancaria' ? 'selected' : ''}>Transferencia Bancaria</option>
+                <option value="Zelle" ${optionData.method === 'Zelle' ? 'selected' : ''}>Zelle</option>
+                <option value="USDT" ${optionData.method === 'USDT' ? 'selected' : ''}>USDT (TRC-20)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Monto</label>
+            <input type="number" name="payment-amount" class="payment-amount" value="${optionData.amount || ''}" required>
+        </div>
+        <div class="form-group">
+            <label>Moneda</label>
+            <select name="payment-currency" class="payment-currency" required>
+                <option value="CUP" ${optionData.currency === 'CUP' ? 'selected' : ''}>CUP</option>
+                <option value="USD" ${optionData.currency === 'USD' ? 'selected' : ''}>USD</option>
+                <option value="USDT" ${optionData.currency === 'USDT' ? 'selected' : ''}>USDT</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Enlace de Pago (dejar en blanco si no aplica)</label>
+            <input type="url" name="payment-link" class="payment-link" value="${optionData.link || ''}">
+        </div>
+
+        <!-- CAMPO ESPECÍFICO PARA TRANSFERENCIA BANCARIA -->
+        <div class="form-group specific-field bank-field" style="display: none;">
+            <label>Número de Tarjeta</label>
+            <input type="text" name="payment-card-number" class="payment-card-number" value="${cardNumber}" placeholder="Ej: 5421 1234 5678 9012">
+        </div>
+
+        <!-- CAMPO ESPECÍFICO PARA USDT -->
+        <div class="form-group specific-field usdt-field" style="display: none;">
+            <label>Dirección de Wallet (TRC-20)</label>
+            <input type="text" name="payment-wallet-address" class="payment-wallet-address" value="${walletAddress}" placeholder="Ej: TXYZopnK7wxVcGk9JZ7J8T9J2o1n3R4p5q">
+        </div>
+
+        <button type="button" class="btn-action btn-delete" onclick="this.parentElement.remove()">Eliminar Opción</button>
+    `;
+    container.appendChild(optionDiv);
+
+    // Mostrar/ocultar campos específicos al cargar
+    const methodSelect = optionDiv.querySelector('.payment-method');
+    toggleSpecificFields(methodSelect);
+}
+
+// Función para mostrar u ocultar los campos específicos
+function toggleSpecificFields(selectElement) {
+    const form = selectElement.closest('.payment-option-form');
+    const bankField = form.querySelector('.bank-field');
+    const usdtField = form.querySelector('.usdt-field');
+
+    // Ocultar todos primero
+    bankField.style.display = 'none';
+    usdtField.style.display = 'none';
+
+    // Mostrar el campo correspondiente
+    if (selectElement.value === 'Transferencia Bancaria') {
+        bankField.style.display = 'block';
+    } else if (selectElement.value === 'USDT') {
+        usdtField.style.display = 'block';
+    }
+}
     function handlePlanSubmit(e) {
-        e.preventDefault();
-        const planId = document.getElementById('plan-id').value;
-        const isEditing = planId !== '';
-        
-        const planData = {
-            name: document.getElementById('plan-name').value,
-            description: document.getElementById('plan-description').value,
-            paymentOptions: []
+    e.preventDefault();
+    const planId = document.getElementById('plan-id').value;
+    const isEditing = planId !== '';
+    
+    const planData = {
+        name: document.getElementById('plan-name').value,
+        description: document.getElementById('plan-description').value,
+        paymentOptions: []
+    };
+
+    const paymentOptionsForms = document.querySelectorAll('.payment-option-form');
+    paymentOptionsForms.forEach(form => {
+        const option = {
+            method: form.querySelector('.payment-method').value,
+            amount: parseFloat(form.querySelector('.payment-amount').value),
+            currency: form.querySelector('.payment-currency').value,
+            link: form.querySelector('.payment-link').value
         };
 
-        const paymentOptionsForms = document.querySelectorAll('.payment-option-form');
-        paymentOptionsForms.forEach(form => {
-            planData.paymentOptions.push({
-                method: form.querySelector('.payment-method').value,
-                amount: parseFloat(form.querySelector('.payment-amount').value),
-                currency: form.querySelector('.payment-currency').value,
-                link: form.querySelector('.payment-link').value
-            });
-        });
+        // Añadir datos específicos si existen
+        const cardNumberInput = form.querySelector('.payment-card-number');
+        if (cardNumberInput && cardNumberInput.value) {
+            option.cardNumber = cardNumberInput.value;
+        }
 
-        const url = isEditing ? `${API_URL}/admin/plans/${planId}` : `${API_URL}/admin/plans`;
-        const method = isEditing ? 'PUT' : 'POST';
+        const walletAddressInput = form.querySelector('.payment-wallet-address');
+        if (walletAddressInput && walletAddressInput.value) {
+            option.walletAddress = walletAddressInput.value;
+        }
 
-        fetch(url, {
-            method: method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(planData)
-        })
-        .then(res => res.json())
-        .then(data => {
-            alert(isEditing ? 'Plan actualizado con éxito.' : 'Plan creado con éxito.');
-            loadPlansList();
-        })
-        .catch(error => {
-            console.error('Error al guardar el plan:', error);
-            alert('Hubo un error al guardar el plan.');
-        });
-    }
+        planData.paymentOptions.push(option);
+    });
+
+    const url = isEditing ? `${API_URL}/admin/plans/${planId}` : `${API_URL}/admin/plans`;
+    const method = isEditing ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(planData)
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert(isEditing ? 'Plan actualizado con éxito.' : 'Plan creado con éxito.');
+        loadPlansList();
+    })
+    .catch(error => {
+        console.error('Error al guardar el plan:', error);
+        alert('Hubo un error al guardar el plan.');
+    });
+}
 
     function handleDeletePlan(planId) {
         if (!confirm('¿Estás seguro de que quieres eliminar este plan?')) return;
