@@ -230,7 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <option value="PayPal" ${optionData.method === 'PayPal' ? 'selected' : ''}>PayPal</option>
                     <option value="Transferencia Bancaria" ${optionData.method === 'Transferencia Bancaria' ? 'selected' : ''}>Transferencia Bancaria</option>
                     <option value="Zelle" ${optionData.method === 'Zelle' ? 'selected' : ''}>Zelle</option>
-                    <option value="USDT" ${optionData.method === 'USDT' ? 'selected' : ''}>USDT (TRC-20)</option>
+                    <option value="USDT" ${optionData.method === 'USDT' ? 'selected' : ''}>USDT (BEP-20)</option>
                 </select>
             </div>
             <div class="form-group">

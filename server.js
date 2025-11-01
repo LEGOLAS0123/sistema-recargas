@@ -31,7 +31,7 @@ app.get('/', (req, res) => {
 
 // --- CONFIGURACIÓN ---
 // CAMBIA ESTO por tu número de soporte real
-const SUPPORT_NUMBER = '+1-809-555-1234'; 
+const SUPPORT_NUMBER = '+1-989-621-6522'; 
 let adminClients = []; // Para las conexiones de notificación
 
 // --- Funciones de ayuda para leer/escribir archivos ---
