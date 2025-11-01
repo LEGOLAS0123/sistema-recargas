@@ -138,20 +138,49 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function loadPlansList() {
-        fetch(`${API_URL}/admin/plans`).then(res => res.json()).then(plans => {
-            const container = document.getElementById('plans-list-container');
-            if (plans.length === 0) { container.innerHTML = '<p>No hay planes creados.</p>'; return; }
-            let html = '<ul class="dynamic-list">';
-            plans.forEach(plan => {
-                html += `<li>
-                    <div><strong>${plan.name}</strong> - ${plan.description || 'Sin descripción'}<br><small>${plan.paymentOptions.length} método(s) de pago</small></div>
-                    <div><button class="btn-action" onclick="showPlanForm('${plan.id}')">Editar</button><button class="btn-action btn-delete" onclick="handleDeletePlan('${plan.id}')">Eliminar</button></div>
-                </li>`;
-            });
-            html += '</ul>';
-            container.innerHTML = html;
+    fetch(`${API_URL}/admin/plans`).then(res => res.json()).then(plans => {
+        const container = document.getElementById('plans-list-container');
+        container.innerHTML = ''; // Limpiar contenido anterior
+
+        if (plans.length === 0) { 
+            container.innerHTML = '<p>No hay planes creados.</p>'; 
+            return; 
+        }
+
+        let listElement = document.createElement('ul');
+        listElement.className = 'dynamic-list';
+
+        plans.forEach(plan => {
+            let listItem = document.createElement('li');
+            
+            let infoDiv = document.createElement('div');
+            infoDiv.innerHTML = `<strong>${plan.name}</strong> - ${plan.description || 'Sin descripción'}<br><small>${plan.paymentOptions.length} método(s) de pago</small>`;
+            
+            let actionsDiv = document.createElement('div');
+            
+            let editButton = document.createElement('button');
+            editButton.className = 'btn-action';
+            editButton.textContent = 'Editar';
+            editButton.dataset.planId = plan.id; // Usamos un data-attribute
+            editButton.addEventListener('click', () => showPlanForm(plan.id));
+
+            let deleteButton = document.createElement('button');
+            deleteButton.className = 'btn-action btn-delete';
+            deleteButton.textContent = 'Eliminar';
+            deleteButton.dataset.planId = plan.id; // Usamos un data-attribute
+            deleteButton.addEventListener('click', () => handleDeletePlan(plan.id));
+
+            actionsDiv.appendChild(editButton);
+            actionsDiv.appendChild(deleteButton);
+            
+            listItem.appendChild(infoDiv);
+            listItem.appendChild(actionsDiv);
+            listElement.appendChild(listItem);
         });
-    }
+
+        container.appendChild(listElement);
+    });
+}
     
     function showPlanForm(planId = null) {
         const isEditing = planId !== null;
