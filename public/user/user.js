@@ -1,16 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // IMPORTANTE: Usa la URL local para desarrollo.
-    // Cámbiala por la de Render solo cuando subas a producción.
+    // IMPORTANTE: Usa la URL de producción para Render.
     const API_URL = 'https://sistema-recargas.onrender.com/api'; 
     
     const mainContent = document.getElementById('main-content');
     const params = new URLSearchParams(window.location.search);
     const planId = params.get('plan');
-
-    // NUEVO: Tu número de soporte de WhatsApp configurado
-    const SUPPORT_PHONE_NUMBER = '+19896216522';
-
-    // CORRECCIÓN: Declaramos 'plan' aquí para que sea accesible en otras funciones como handlePaymentSubmit
+    const SUPPORT_PHONE_NUMBER = '19896216522';
     let plan;
 
     // NUEVO: Configurar el botón de soporte de WhatsApp al cargar la página
@@ -72,10 +67,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h2>Completar Recarga</h2>
                 <form id="payment-form">
                     <div class="form-group">
-                        <label for="phoneNumber">Número de Teléfono a Recargar</label>
+                        <label for="phoneNumber">Número de la cuenta a recargar</label>
                         <input type="tel" id="phoneNumber" name="phoneNumber" placeholder="+53 5xxxxxxx" required>
                     </div>
-                    <h3>Selecciona un Método de Pago</h3>
+                    <h3>Selecciona un método de pago</h3>
                     <div class="payment-options-list">
                         ${paymentOptionsHtml}
                     </div>
@@ -155,15 +150,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 return res.json();
             })
             .then(planData => {
-                if (planData) {
-                    showPaymentForm(planData);
-                } else {
-                    mainContent.innerHTML = '<p>Plan no encontrado.</p>';
-                }
+                if (planData) { showPaymentForm(planData); }
+                else { mainContent.innerHTML = '<p>Plan no encontrado.</p>'; }
             })
             .catch(error => {
                 console.error('Error al cargar el plan:', error);
-                // --- MEJORA: Mostrar un mensaje de error más claro al usuario ---
                 mainContent.innerHTML = `<p>Error: No se pudo cargar el plan solicitado. Es posible que no exista. <a href="/">Volver a la lista de planes</a></p>`;
             });
     } else {
