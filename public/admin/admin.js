@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const API_URL = 'https://sistema-recargas.onrender.com/api'; // <-- CAMBIAR ESTO PARA RENDER
+    // IMPORTANTE: Usa la URL de producción para Render
+    const API_URL = 'https://sistema-recargas.onrender.com/api'; 
     const mainContent = document.getElementById('main-content');
     let eventSource;
 
@@ -42,12 +43,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showDashboard() {
-        document.getElementById('btn-logout').style.display = 'block';
-        const supportBtn = document.getElementById('btn-support');
-        if (supportBtn) {
-            supportBtn.style.display = 'inline-flex';
-            supportBtn.href = `https://wa.me/19896216522`;
-        }
         mainContent.innerHTML = `
             <nav>
                 <button id="nav-transactions" class="active">Transacciones</button>
@@ -56,6 +51,17 @@ document.addEventListener('DOMContentLoaded', () => {
             </nav>
             <div id="dashboard-content"></div>
         `;
+
+        const logoutBtn = document.getElementById('btn-logout');
+        const supportBtn = document.getElementById('btn-support');
+
+        if (logoutBtn) {
+            logoutBtn.style.display = 'block';
+        }
+        if (supportBtn) {
+            supportBtn.style.display = 'inline-flex';
+            supportBtn.href = `https://wa.me/19896216522`;
+        }
         
         if ('Notification' in window) {
             if (Notification.permission === 'default') {
@@ -65,7 +71,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.getElementById('nav-transactions').addEventListener('click', () => {
             const badge = document.getElementById('notification-badge');
-            if (badge) { badge.style.display = 'none'; }
+            if (badge) {
+                badge.style.display = 'none';
+            }
             showTransactionsView();
         });
         document.getElementById('nav-plans').addEventListener('click', showPlansView);
@@ -79,36 +87,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startNotifications() {
-    if (eventSource) eventSource.close();
-    eventSource = new EventSource(`${API_URL}/admin/notifications-stream`);
-    eventSource.onmessage = function(event) {
-        const notification = JSON.parse(event.data);
-        if (notification.type === 'connected') { return; }
-        if (Notification.permission === 'granted') {
-            new Notification('Nueva Actividad', {
-                body: `Comprobante recibido para ${notification.payload.phoneNumber}`,
-                icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">📱</text></svg>'
-            });
-        }
-        
-        // --- CORRECCIÓN PARA EL SONIDO ---
-        const sound = new Audio('/admin/notification.mp3');
-        const playPromise = sound.play();
-        
-        if (playPromise !== undefined) {
-            playPromise.catch(error => console.error("Error al reproducir el sonido:", error));
-        }
-        
-        const badge = document.getElementById('notification-badge');
-        if (badge) {
-            badge.style.display = 'inline-block';
-        }
-        if (document.getElementById('nav-transactions').classList.contains('active')) {
-            showTransactionsView();
-        }
-    };
-    eventSource.onerror = function(err) { console.error("Error en EventSource:", err); eventSource.close(); setTimeout(startNotifications, 5000); };
-}
+        if (eventSource) eventSource.close();
+        eventSource = new EventSource(`${API_URL}/admin/notifications-stream`);
+        eventSource.onmessage = function(event) {
+            const notification = JSON.parse(event.data);
+            if (notification.type === 'connected') { return; }
+            if (Notification.permission === 'granted') {
+                new Notification('Nueva Actividad', {
+                    body: `Comprobante recibido para ${notification.payload.phoneNumber}`,
+                    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">📱</text></svg>'
+                });
+            }
+            const sound = new Audio('/admin/notification.mp3');
+            const playPromise = sound.play();
+            
+            if (playPromise !== undefined) {
+                playPromise.catch(error => console.error("Error al reproducir el sonido:", error));
+            }
+            
+            const badge = document.getElementById('notification-badge');
+            if (badge) {
+                badge.style.display = 'inline-block';
+            }
+            if (document.getElementById('nav-transactions').classList.contains('active')) {
+                showTransactionsView();
+            }
+        };
+        eventSource.onerror = function(err) { console.error("Error en EventSource:", err); eventSource.close(); setTimeout(startNotifications, 5000); };
+    }
 
     function showTransactionsView() {
         setActiveNav('nav-transactions');
@@ -334,45 +340,86 @@ document.addEventListener('DOMContentLoaded', () => {
     function showStatsView() {
         setActiveNav('nav-stats');
         const content = document.getElementById('dashboard-content');
-        content.innerHTML = '<h2>Estadísticas del Negocio</h2><p>Cargando datos...</p>';
+        content.innerHTML = `
+            <div class="stats-header">
+                <h2>Estadísticas del Negocio</h2>
+                <button id="reset-stats-btn" class="btn-action btn-delete">Reiniciar Estadísticas</button>
+            </div>
+            <div id="stats-container">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Ingresos Totales</h3>
+                        <p class="stat-number">$0.00</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Recargas Completadas</h3>
+                        <p class="stat-number">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Recargas Pendientes</h3>
+                        <p class="stat-number">0</p>
+                    </div>
+                </div>
+                <div class="stats-details">
+                    <h3>Ingresos por Método de Pago</h3>
+                    <ul id="stats-payment-methods-list">
+                        <li><strong>Cargando...</strong></li>
+                    </ul>
+                </div>
+            </div>
+        `;
 
+        document.getElementById('reset-stats-btn').addEventListener('click', () => {
+            if (!confirm('¿Estás seguro de que quieres reiniciar todas las estadísticas? Esta acción no se puede deshacer.')) {
+                return;
+            }
+            resetStats();
+            alert('Estadísticas reiniciadas.');
+        });
+
+        loadStatsData();
+    }
+
+    function loadStatsData() {
         fetch(`${API_URL}/admin/stats`)
             .then(res => res.json())
             .then(stats => {
-                let html = `
-                    <div class="stats-container">
-                        <div class="stat-card">
-                            <h3>Ingresos Totales</h3>
-                            <p class="stat-number">$${stats.totalRevenue.toFixed(2)}</p>
-                        </div>
-                        <div class="stat-card">
-                            <h3>Recargas Completadas</h3>
-                            <p class="stat-number">${stats.totalTransactions}</p>
-                        </div>
-                        <div class="stat-card">
-                            <h3>Recargas Pendientes</h3>
-                            <p class="stat-number">${stats.pendingTransactions}</p>
-                        </div>
-                    </div>
-                    <div class="stats-details">
-                        <h3>Ingresos por Método de Pago</h3>
-                        <ul>
-                `;
+                // Actualizar las tarjetas principales
+                document.querySelector('.stat-card:nth-child(1) .stat-number').textContent = `$${stats.totalRevenue.toFixed(2)}`;
+                document.querySelector('.stat-card:nth-child(2) .stat-number').textContent = stats.totalTransactions;
+                document.querySelector('.stat-card:nth-child(3) .stat-number').textContent = stats.pendingTransactions;
 
-                for (const method in stats.revenueByMethod) {
-                    html += `<li><strong>${method}:</strong> $${stats.revenueByMethod[method].toFixed(2)}</li>`;
-                }
-
+                // Actualizar la lista de métodos de pago
+                const methodsList = document.getElementById('stats-payment-methods-list');
+                methodsList.innerHTML = '';
                 if (Object.keys(stats.revenueByMethod).length === 0) {
-                    html += `<li>No hay ingresos registrados aún.</li>`;
+                    methodsList.innerHTML = '<li><strong>No hay ingresos registrados aún.</li>';
+                } else {
+                    for (const method in stats.revenueByMethod) {
+                        methodsList.innerHTML += `<li><strong>${method}:</strong> $${stats.revenueByMethod[method].toFixed(2)}</li>`;
+                    }
                 }
-
-                html += `</ul></div>`;
-                content.innerHTML = html;
             })
             .catch(error => {
                 console.error('Error al cargar estadísticas:', error);
                 content.innerHTML = '<p>Error al cargar las estadísticas.</p>';
+            });
+    }
+
+    function resetStats() {
+        const confirmation = confirm('¡ATENCIÓN! Esta acción eliminará permanentemente todas las transacciones completadas y restablecerá las estadísticas a cero. ¿Estás seguro de que quieres continuar?');
+        if (!confirmation) {
+            return;
+        }
+        fetch(`${API_URL}/admin/reset-stats`, { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                alert(data.message);
+                loadStatsData(); // Recargar los datos para mostrar que se han reiniciado
+            })
+            .catch(error => {
+                console.error('Error al reiniciar las estadísticas:', error);
+                alert('Hubo un error al contactar al servidor.');
             });
     }
 });
