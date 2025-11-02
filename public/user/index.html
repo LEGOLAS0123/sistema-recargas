@@ -3,20 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Recargas Rápidas</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="manifest.json">
+    <title>Sistema de Recargas</title>
+    <link rel="stylesheet" href="/user/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="app-container">
-        <header>
-            <h1>Recargas Rápidas</h1>
-            <a href="tel:" id="support-link" class="btn-support">📞 Soporte</a>
-        </header>
-        <main id="main-content">
-            <div id="loading-message">Cargando planes...</div>
-        </main>
-    </div>
-    <script src="user.js"></script>
+    <header>
+        <div>
+            <h1>Sistema de Recargas</h1>
+            <!-- Botón de Soporte de WhatsApp Añadido -->
+            <a id="btn-support" href="#" target="_blank" rel="noopener noreferrer" title="Contactar Soporte por WhatsApp">
+                💬 Soporte
+            </a>
+        </div>
+    </header>
+
+    <main>
+        <div id="main-content">
+            <!-- El contenido se cargará aquí dinámicamente -->
+        </div>
+    </main>
+
+    <script src="/user/user.js"></script>
 </body>
 </html>

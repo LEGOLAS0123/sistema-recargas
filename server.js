@@ -1,234 +1,165 @@
 const express = require('express');
 const cors = require('cors');
-const fs = require('fs').promises;
+const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+const sqlite3 = require('sqlite3').verbose();
 
 const app = express();
-const PORT = process.env.PORT || 3000; 
-
-// --- ARCHIVOS DE DATOS (¡IMPORTANTE! Deben estar definidos ANTES que las rutas) ---
-const PLANS_FILE = path.join(__dirname, 'data', 'plans.json');
-const TRANSACTIONS_FILE = path.join(__dirname, 'data', 'transactions.json');
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
-// NUEVO: Configurar Content Security Policy para Render
-app.use((req, res, next) => {
-    res.setHeader(
-        "Content-Security-Policy",
-        "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self'; img-src 'self' data:;"
-    );
-    next();
+// --- CONFIGURACIÓN DE ARCHIVOS ESTÁTICOS Y RUTAS ---
+app.use('/user', express.static(path.join(__dirname, 'public', 'user')));
+app.use('/admin', express.static(path.join(__dirname, 'public', 'admin')));
+app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'public', 'user', 'index.html')); });
+app.get('/admin', (req, res) => { res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html')); });
+
+// --- CONFIGURACIÓN DE LA BASE DE DATOS ---
+const db = new sqlite3.Database('./recargas.db', sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, (err) => {
+    if (err) { console.error("Error al conectar con la base de datos:", err.message); }
+    else { console.log('Conectado a la base de datos SQLite.'); initializeDatabase(); }
 });
 
-// NUEVO: Redirigir la ruta principal a la app del usuario
-app.get('/', (req, res) => {
-    res.redirect('/user/');
-});
+function initializeDatabase() {
+    db.run(`CREATE TABLE IF NOT EXISTS plans (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, paymentOptions TEXT NOT NULL)`, (err) => { if (err) console.error("Error al crear la tabla 'plans':", err.message); });
+    db.run(`CREATE TABLE IF NOT EXISTS transactions (id TEXT PRIMARY KEY, phoneNumber TEXT NOT NULL, proofText TEXT, status TEXT NOT NULL, paymentOption TEXT NOT NULL, createdAt DATETIME DEFAULT CURRENT_TIMESTAMP)`, (err) => { if (err) console.error("Error al crear la tabla 'transactions':", err.message); });
+}
 
-// --- CONFIGURACIÓN ---
-// CAMBIA ESTO por tu número de soporte real
-const SUPPORT_NUMBER = '+1-989-621-6522'; 
-let adminClients = []; // Para las conexiones de notificación
-
-// --- Funciones de ayuda para leer/escribir archivos ---
-// VERSIÓN A PRUEBA DE BALAS - NUNCA FALLARÁ
-const readFile = async (file) => {
-    try {
-        const data = await fs.readFile(file, 'utf-8');
-        if (!data) {
-            console.log(`[AVISO] El archivo ${file} está vacío. Devolviendo array vacío.`);
-            return [];
-        }
-        return JSON.parse(data);
-    } catch (error) {
-        // CUALQUIER error que ocurra, lo registraremos y devolveremos un array vacío.
-        console.error(`[ERROR] Fallo al leer ${file}. Error: ${error.message}. Devolviendo array vacío para evitar caídas.`);
-        return []; // <-- ¡La clave! Siempre devuelve un array, nunca un error.
-    }
-};
-
-const writeFile = async (file, data) => {
-    await fs.writeFile(file, JSON.stringify(data, null, 2), 'utf-8');
-};
-
-// --- Rutas para el USUARIO ---
-app.get('/api/support-info', (req, res) => {
-    res.json({ supportNumber: SUPPORT_NUMBER });
-});
-
-app.get('/api/plans', async (req, res) => {
-    console.log("[DEBUG] Ruta /api/plans alcanzada. Iniciando...");
-    try {
-        console.log("[DEBUG] Llamando a readFile para PLANS_FILE...");
-        const plans = await readFile(PLANS_FILE);
-        console.log("[DEBUG] readFile para planes tuvo éxito. Datos recibidos:", plans);
+// --- ENDPOINTS DE LA API ---
+app.get('/api/plans', (req, res) => {
+    db.all("SELECT * FROM plans", [], (err, rows) => {
+        if (err) { res.status(500).json({ message: "Error al obtener los planes." }); return; }
+        const plans = rows.map(row => ({ ...row, paymentOptions: JSON.parse(row.paymentOptions) }));
         res.json(plans);
-        console.log("[DEBUG] Respuesta JSON para planes enviada correctamente.");
-    } catch (error) {
-        console.error("[DEBUG] ERROR en la ruta /api/plans:", error);
-        res.status(500).json({ message: 'Error al leer los planes.' });
-    }
+    });
 });
 
-app.post('/api/transactions', async (req, res) => {
-    try {
-        const { planId, phoneNumber, paymentOption } = req.body;
-        const transactions = await readFile(TRANSACTIONS_FILE);
-        const newTransaction = {
-            id: Date.now().toString(),
-            planId,
-            phoneNumber,
-            paymentOption,
-            status: 'PENDING_PAYMENT',
-            createdAt: new Date().toISOString(),
-            proofText: null,
-        };
-        transactions.push(newTransaction);
-        await writeFile(TRANSACTIONS_FILE, transactions);
-        notifyAdmins('NEW_TRANSACTION', newTransaction);
-        res.status(201).json(newTransaction);
-    } catch (error) {
-        res.status(500).json({ message: 'Error al crear la transacción.' });
-    }
+app.get('/api/plans/:id', (req, res) => {
+    const { id } = req.params;
+    db.get("SELECT * FROM plans WHERE id = ?", [id], (err, row) => {
+        if (err) { res.status(500).json({ message: "Error al obtener el plan." }); return; }
+        if (row) { const plan = { ...row, paymentOptions: JSON.parse(row.paymentOptions) }; res.json(plan); }
+        else { res.status(404).json({ message: "Plan no encontrado." }); }
+    });
 });
 
-app.post('/api/transactions/:id/proof', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { proofText } = req.body;
-        let transactions = await readFile(TRANSACTIONS_FILE);
-        const transactionIndex = transactions.findIndex(t => t.id === id);
-        if (transactionIndex === -1) return res.status(404).json({ message: 'Transacción no encontrada.' });
-        transactions[transactionIndex].status = 'PENDING_VERIFICATION';
-        transactions[transactionIndex].proofText = proofText;
-        await writeFile(TRANSACTIONS_FILE, transactions);
-        notifyAdmins('PROOF_SUBMITTED', transactions[transactionIndex]);
-        res.json({ message: 'Comprobante recibido.' });
-    } catch (error) {
-        res.status(500).json({ message: 'Error al enviar el comprobante.' });
-    }
+app.get('/api/admin/plans', (req, res) => {
+    db.all("SELECT * FROM plans", [], (err, rows) => {
+        if (err) { res.status(500).json({ message: "Error al obtener los planes." }); return; }
+        const plans = rows.map(row => ({ ...row, paymentOptions: JSON.parse(row.paymentOptions) }));
+        res.json(plans);
+    });
 });
 
-// --- Rutas para el ADMINISTRADOR ---
-const ADMIN_USER = 'gustacarmen91@gmail.com';
-const ADMIN_PASS = 'Legolas*/21';
+app.post('/api/admin/plans', (req, res) => {
+    const { name, description, paymentOptions } = req.body;
+    const newPlan = { id: uuidv4(), name, description, paymentOptions: JSON.stringify(paymentOptions) };
+    db.run(`INSERT INTO plans (id, name, description, paymentOptions) VALUES (?, ?, ?, ?)`,
+        [newPlan.id, newPlan.name, newPlan.description, newPlan.paymentOptions],
+        function(err) {
+            if (err) { res.status(500).json({ message: "Error al crear el plan." }); return; }
+            res.status(201).json({ ...newPlan, paymentOptions: JSON.parse(newPlan.paymentOptions) });
+        }
+    );
+});
+
+app.put('/api/admin/plans/:id', (req, res) => {
+    const { id } = req.params;
+    const { name, description, paymentOptions } = req.body;
+    const updatedPaymentOptions = JSON.stringify(paymentOptions);
+    db.run(`UPDATE plans SET name = ?, description = ?, paymentOptions = ? WHERE id = ?`,
+        [name, description, updatedPaymentOptions, id],
+        function(err) {
+            if (err) { res.status(500).json({ message: "Error al actualizar el plan." }); return; }
+            if (this.changes === 0) { res.status(404).json({ message: "Plan no encontrado." }); }
+            else { res.json({ id, name, description, paymentOptions }); }
+        }
+    );
+});
+
+app.delete('/api/admin/plans/:id', (req, res) => {
+    const { id } = req.params;
+    db.run(`DELETE FROM plans WHERE id = ?`, [id], function(err) {
+        if (err) { res.status(500).json({ message: "Error al eliminar el plan." }); return; }
+        if (this.changes === 0) { res.status(404).json({ message: "Plan no encontrado." }); }
+        else { res.json({ message: "Plan eliminado correctamente." }); }
+    });
+});
+
+app.post('/api/transactions', (req, res) => {
+    const { phoneNumber, proofText, paymentOption } = req.body;
+    const newTransaction = { id: uuidv4(), phoneNumber, proofText, status: 'PENDING_VERIFICATION', paymentOption: JSON.stringify(paymentOption) };
+    db.run(`INSERT INTO transactions (id, phoneNumber, proofText, status, paymentOption) VALUES (?, ?, ?, ?, ?)`,
+        [newTransaction.id, newTransaction.phoneNumber, newTransaction.proofText, newTransaction.status, newTransaction.paymentOption],
+        function(err) {
+            if (err) { res.status(500).json({ message: "Error al crear la transacción." }); return; }
+            res.status(201).json({ success: true, message: "Solicitud de recarga recibida.", transactionId: newTransaction.id });
+        }
+    );
+});
+
+app.get('/api/admin/transactions', (req, res) => {
+    db.all("SELECT * FROM transactions ORDER BY createdAt DESC", [], (err, rows) => {
+        if (err) { res.status(500).json({ message: "Error al obtener las transacciones." }); return; }
+        const transactions = rows.map(row => ({ ...row, paymentOption: JSON.parse(row.paymentOption) }));
+        res.json(transactions);
+    });
+});
+
+app.post('/api/admin/transactions/:id/process', (req, res) => {
+    const { id } = req.params;
+    db.run(`UPDATE transactions SET status = 'COMPLETED' WHERE id = ?`, [id], function(err) {
+        if (err) { res.status(500).json({ message: "Error al procesar la transacción." }); return; }
+        if (this.changes === 0) { res.status(404).json({ message: "Transacción no encontrada." }); }
+        else { res.json({ message: "Recarga procesada y marcada como completada." }); }
+    });
+});
 
 app.post('/api/admin/login', (req, res) => {
     const { username, password } = req.body;
-    if (username === ADMIN_USER && password === ADMIN_PASS) {
-        res.json({ success: true, message: 'Login exitoso.' });
-    } else {
-        res.status(401).json({ success: false, message: 'Credenciales incorrectas.' });
-    }
+    const ADMIN_USER = process.env.ADMIN_USER || 'admin';
+    const ADMIN_PASS = process.env.ADMIN_PASS || 'password';
+    if (username === ADMIN_USER && password === ADMIN_PASS) { res.json({ success: true }); }
+    else { res.status(401).json({ success: false, message: 'Credenciales incorrectas.' }); }
 });
 
-// --- RUTA PARA LISTAR TRANSACCIONES (LA QUE FALTABA) ---
-app.get('/api/admin/transactions', async (req, res) => {
-    try {
-        const transactions = await readFile(TRANSACTIONS_FILE);
-        transactions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        res.json(transactions);
-    } catch (error) {
-        res.status(500).json({ message: 'Error al leer las transacciones.' });
-    }
-});
-
-app.post('/api/admin/transactions/:id/process', async (req, res) => {
-    try {
-        const { id } = req.params;
-        let transactions = await readFile(TRANSACTIONS_FILE);
-        const transactionIndex = transactions.findIndex(t => t.id === id);
-        if (transactionIndex === -1) return res.status(404).json({ message: 'Transacción no encontrada.' });
-        console.log(`>> SIMULACIÓN: Recargando ${transactions[transactionIndex].paymentOption.amount} ${transactions[transactionIndex].paymentOption.currency} al ${transactions[transactionIndex].phoneNumber}. ¡ÉXITO!`);
-        transactions[transactionIndex].status = 'COMPLETED';
-        transactions[transactionIndex].processedAt = new Date().toISOString();
-        await writeFile(TRANSACTIONS_FILE, transactions);
-        res.json({ message: 'Recarga procesada con éxito.' });
-    } catch (error) {
-        res.status(500).json({ message: 'Error al procesar la recarga.' });
-    }
-});
-
-// Rutas CRUD para planes
-app.get('/api/admin/plans', async (req, res) => {
-    try {
-        const plans = await readFile(PLANS_FILE);
-        res.json(plans);
-    } catch (error) {
-        res.status(500).json({ message: 'Error al leer los planes.' });
-    }
-});
-
-app.post('/api/admin/plans', async (req, res) => {
-    try {
-        const plans = await readFile(PLANS_FILE);
-        const newPlan = { ...req.body, id: Date.now().toString() };
-        plans.push(newPlan);
-        await writeFile(PLANS_FILE, plans);
-        res.status(201).json(newPlan);
-    } catch (error) {
-        res.status(500).json({ message: 'Error al crear el plan.' });
-    }
-});
-
-app.put('/api/admin/plans/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        let plans = await readFile(PLANS_FILE);
-        const planIndex = plans.findIndex(p => p.id === id);
-        if (planIndex === -1) return res.status(404).json({ message: 'Plan no encontrado.' });
-        plans[planIndex] = { ...plans[planIndex], ...req.body };
-        await writeFile(PLANS_FILE, plans);
-        res.json(plans[planIndex]);
-    } catch (error) {
-        res.status(500).json({ message: 'Error al actualizar el plan.' });
-    }
-});
-
-app.delete('/api/admin/plans/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        let plans = await readFile(PLANS_FILE);
-        const newPlans = plans.filter(p => p.id !== id);
-        if (plans.length === newPlans.length) return res.status(404).json({ message: 'Plan no encontrado.' });
-        await writeFile(PLANS_FILE, newPlans);
-        res.json({ message: 'Plan eliminado.' });
-    } catch (error) {
-        res.status(500).json({ message: 'Error al eliminar el plan.' });
-    }
-});
-
-// --- Sistema de Notificaciones SSE para Admin ---
 app.get('/api/admin/notifications-stream', (req, res) => {
-    res.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive'
-    });
-    const clientId = Date.now();
-    const newClient = { id: clientId, res };
-    adminClients.push(newClient);
-    console.log(`Admin client connected: ${clientId}`);
-    newClient.res.write(`data: ${JSON.stringify({ type: 'connected', message: 'Conectado a las notificaciones' })}\n\n`);
-    req.on('close', () => {
-        adminClients = adminClients.filter(client => client.id !== clientId);
-        console.log(`Admin client disconnected: ${clientId}`);
-    });
+    res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' });
+    res.write('data: {"type": "connected"}\n\n');
+    const checkInterval = setInterval(() => {
+        db.get("SELECT id, phoneNumber, status, paymentOption FROM transactions WHERE status = 'PENDING_VERIFICATION' ORDER BY createdAt DESC LIMIT 1", [], (err, row) => {
+            if (row) { res.write(`data: ${JSON.stringify({ type: 'new_transaction', payload: row })}\n\n`); }
+        });
+    }, 5000);
+    req.on('close', () => clearInterval(checkInterval));
 });
 
-function notifyAdmins(eventType, data) {
-    const message = JSON.stringify({ type: eventType, payload: data });
-    adminClients.forEach(client => client.res.write(`data: ${message}\n\n`));
-}
+// Endpoint de Estadísticas para el Admin
+app.get('/api/admin/stats', (req, res) => {
+    const stats = { totalRevenue: 0, totalTransactions: 0, pendingTransactions: 0, revenueByMethod: {} };
+    db.all("SELECT paymentOption FROM transactions WHERE status = 'COMPLETED'", [], (err, rows) => {
+        if (err) { return res.status(500).json({ message: "Error al calcular estadísticas de ingresos." }); }
+        rows.forEach(row => {
+            const option = JSON.parse(row.paymentOption);
+            const amount = parseFloat(option.amount);
+            const method = option.method;
+            stats.totalRevenue += amount;
+            stats.totalTransactions++;
+            if (stats.revenueByMethod[method]) { stats.revenueByMethod[method] += amount; }
+            else { stats.revenueByMethod[method] = amount; }
+        });
+        db.get("SELECT COUNT(*) as count FROM transactions WHERE status = 'PENDING_VERIFICATION'", [], (err, row) => {
+            if (err) { return res.status(500).json({ message: "Error al calcular transacciones pendientes." }); }
+            stats.pendingTransactions = row.count;
+            res.json(stats);
+        });
+    });
+});
 
 // Iniciar servidor
 app.listen(PORT, () => {
-    console.log(`============================================`);
-    console.log(`¡SERVIDOR INICIADO CORRECTAMENTE!`);
-    console.log(`Escuchando en el puerto: ${PORT}`);
-    console.log(`============================================`);
+    console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });

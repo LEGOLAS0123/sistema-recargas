@@ -1,160 +1,172 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // IMPORTANTE: Reemplaza esta URL con la de tu aplicación en Render
+    // IMPORTANTE: Usa la URL local para desarrollo.
+    // Cámbiala por la de Render solo cuando subas a producción.
     const API_URL = 'https://sistema-recargas.onrender.com/api'; 
+    
     const mainContent = document.getElementById('main-content');
+    const params = new URLSearchParams(window.location.search);
+    const planId = params.get('plan');
 
-    let selectedPlan = null;
-    let currentTransaction = null;
+    // NUEVO: Tu número de soporte de WhatsApp configurado
+    const SUPPORT_PHONE_NUMBER = '+19896216522';
 
-    fetchSupportInfo();
-    loadPlansView();
+    // CORRECCIÓN: Declaramos 'plan' aquí para que sea accesible en otras funciones como handlePaymentSubmit
+    let plan;
 
-    function fetchSupportInfo() {
-        fetch(`${API_URL}/support-info`)
-            .then(res => res.json())
-            .then(data => {
-                const supportLink = document.getElementById('support-link');
-                if (supportLink) {
-                    supportLink.href = `tel:${data.supportNumber}`;
-                }
-            })
-            .catch(error => console.error('No se pudo cargar el número de soporte:', error));
+    // NUEVO: Configurar el botón de soporte de WhatsApp al cargar la página
+    const supportBtn = document.getElementById('btn-support');
+    if (supportBtn) {
+        supportBtn.href = `https://wa.me/${SUPPORT_PHONE_NUMBER}`;
     }
 
-    function loadPlansView() {
-        mainContent.innerHTML = '<div id="loading-message">Cargando planes...</div>';
+    function showPlansList() {
+        mainContent.innerHTML = '<h2>Selecciona un Plan de Recarga</h2><p>Cargando planes...</p>';
         fetch(`${API_URL}/plans`)
             .then(res => res.json())
             .then(plans => {
-                if (plans.length === 0) { mainContent.innerHTML = '<p>No hay planes disponibles.</p>'; return; }
-                renderPlans(plans);
+                if (plans.length === 0) {
+                    mainContent.innerHTML = '<p>No hay planes disponibles en este momento.</p>';
+                    return;
+                }
+                let html = '<div class="plans-grid">';
+                plans.forEach(p => {
+                    html += `
+                        <div class="plan-card">
+                            <h3>${p.name}</h3>
+                            <p>${p.description || 'Recarga rápida y segura.'}</p>
+                            <div class="price-tag">Desde ${p.paymentOptions[0].amount} ${p.paymentOptions[0].currency}</div>
+                            <button onclick="location.href='?plan=${p.id}'">Recargar Ahora</button>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                mainContent.innerHTML = html;
             })
             .catch(error => {
-                console.error('Error al cargar planes:', error);
-                mainContent.innerHTML = '<p class="message error">Error al cargar los planes.</p>';
+                console.error('Error al cargar los planes:', error);
+                mainContent.innerHTML = '<p>Ocurrió un error al cargar los planes. Por favor, intenta de nuevo más tarde.</p>';
             });
     }
 
-    function renderPlans(plans) {
-        mainContent.innerHTML = '<h2>Selecciona un Plan</h2>';
-        const container = document.createElement('div');
-        plans.forEach(plan => {
-            const card = document.createElement('div');
-            card.className = 'plan-card';
-            card.innerHTML = `
-                <h3>${plan.name}</h3>
-                <p>${plan.description || ''}</p>
-                <button class="btn-select-plan" data-plan='${JSON.stringify(plan)}'>Ver Opciones de Pago</button>
-            `;
-            container.appendChild(card);
-        });
-        mainContent.appendChild(container);
-        document.querySelectorAll('.btn-select-plan').forEach(btn => {
-            btn.addEventListener('click', () => {
-                selectedPlan = JSON.parse(btn.dataset.plan);
-                loadPaymentMethodsView();
-            });
-        });
-    }
+    function showPaymentForm(planData) {
+        // CORRECCIÓN: Asignamos el plan recibido a la variable 'plan' del scope superior
+        plan = planData;
 
-    function loadPaymentMethodsView() {
-        mainContent.innerHTML = `
-            <h2>Opciones de Pago</h2>
-            <p>Plan: <strong>${selectedPlan.name}</strong></p>
-            <div id="methods-container"></div>
-            <button id="btn-back-to-plans">Volver</button>
-        `;
-        const container = document.getElementById('methods-container');
-        selectedPlan.paymentOptions.forEach(option => {
-            const card = document.createElement('div');
-            card.className = 'payment-method-card';
-            let icon = option.method.includes('QVPay') ? '💳' : option.method.includes('PayPal') ? '🌐' : '🏦';
-            card.innerHTML = `
-                <div class="method-info">
-                    <span class="method-icon">${icon}</span>
-                    <div>
-                        <h4>${option.method}</h4>
-                        <p class="method-price">${option.amount} ${option.currency}</p>
-                    </div>
+        let paymentOptionsHtml = '';
+        plan.paymentOptions.forEach(option => {
+            paymentOptionsHtml += `
+                <div class="payment-option">
+                    <input type="radio" id="option-${option.id}" name="paymentOption" value="${option.id}" required>
+                    <label for="option-${option.id}">
+                        <strong>${option.method}</strong> - ${option.amount} ${option.currency}
+                    </label>
+                    ${option.link ? `<a href="${option.link}" target="_blank" rel="noopener noreferrer" class="payment-link">Pagar aquí</a>` : ''}
+                    ${option.destinationDetails ? `<p class="destination-details">${option.destinationDetails.replace(/\n/g, '<br>')}</p>` : ''}
                 </div>
-                <button class="btn-select-method" data-method='${JSON.stringify(option)}'>Pagar con este método</button>
             `;
-            container.appendChild(card);
         });
-        document.querySelectorAll('.btn-select-method').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const paymentOption = JSON.parse(btn.dataset.method);
-                showInstructionsView(paymentOption);
-            });
-        });
-        document.getElementById('btn-back-to-plans').addEventListener('click', loadPlansView);
-    }
 
-    function showInstructionsView(paymentOption) {
-    let destinationInfo = '';
-
-    // Mostrar las instrucciones de destino si existen
-    if (paymentOption.destinationDetails) {
-        destinationInfo = `
-            <div class="message info" style="text-align: left; white-space: pre-wrap;">
-                <strong>Transferir a:</strong><br>
-                ${paymentOption.destinationDetails}
+        mainContent.innerHTML = `
+            <div class="form-container">
+                <button onclick="location.href='/'" class="back-button">← Volver a los planes</button>
+                <h2>Completar Recarga</h2>
+                <form id="payment-form">
+                    <div class="form-group">
+                        <label for="phoneNumber">Número de Teléfono a Recargar</label>
+                        <input type="tel" id="phoneNumber" name="phoneNumber" placeholder="+53 5xxxxxxx" required>
+                    </div>
+                    <h3>Selecciona un Método de Pago</h3>
+                    <div class="payment-options-list">
+                        ${paymentOptionsHtml}
+                    </div>
+                    <div class="form-group">
+                        <label for="proofText">Número de Referencia, ID de Transacción o Captura de Pago</label>
+                        <textarea id="proofText" name="proofText" rows="4" placeholder="Pega aquí el comprobante de pago..." required></textarea>
+                    </div>
+                    <button type="submit">Enviar Solicitud de Recarga</button>
+                </form>
+                <div id="form-message"></div>
             </div>
         `;
+
+        document.getElementById('payment-form').addEventListener('submit', handlePaymentSubmit);
     }
 
-    mainContent.innerHTML = `
-        <h2>Instrucciones de Pago</h2>
-        <p><strong>Método:</strong> ${paymentOption.method}</p>
-        <p><strong>Monto:</strong> ${paymentOption.amount} ${paymentOption.currency}</p>
-        ${paymentOption.link ? `<p><strong>Enlace:</strong> <a href="${paymentOption.link}" target="_blank">${paymentOption.link}</a></p>` : ''}
-        ${destinationInfo}
-        <p>Una vez realizado el pago, pega el comprobante a continuación.</p>
-        <div class="form-group">
-            <label for="proof-text">Comprobante de Pago:</label>
-            <textarea id="proof-text" rows="4" placeholder="Pega aquí el mensaje de confirmación..."></textarea>
-        </div>
-        <div class="form-group">
-            <label for="phone-number">Tu Número de Teléfono:</label>
-            <input type="tel" id="phone-number" placeholder="Ej: 809-555-1234" required>
-        </div>
-        <button id="btn-submit-proof">Enviar Comprobante</button>
-        <button id="btn-back-to-methods">Volver</button>
-    `;
-    document.getElementById('btn-submit-proof').addEventListener('click', () => handleSubmitProof(paymentOption));
-    document.getElementById('btn-back-to-methods').addEventListener('click', loadPaymentMethodsView);
-}
-    function handleSubmitProof(paymentOption) {
-        const proofText = document.getElementById('proof-text').value;
-        const phoneNumber = document.getElementById('phone-number').value;
-        if (!proofText || !phoneNumber) { alert('Completa todos los campos.'); return; }
-        const submitBtn = document.getElementById('btn-submit-proof');
-        submitBtn.disabled = true; submitBtn.textContent = 'Enviando...';
+    function handlePaymentSubmit(e) {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+        const messageDiv = document.getElementById('form-message');
+
+        const selectedOptionId = formData.get('paymentOption');
         
+        // --- MEJORA: Comprobar si se seleccionó una opción de pago ---
+        if (!selectedOptionId) {
+            messageDiv.textContent = 'Por favor, selecciona un método de pago.';
+            messageDiv.className = 'message error';
+            return; // Detener la ejecución aquí
+        }
+
+        const selectedOption = plan.paymentOptions.find(opt => opt.id == selectedOptionId);
+
+        // --- MEJORA: Comprobar si se encontró la opción ---
+        if (!selectedOption) {
+            messageDiv.textContent = 'Hubo un error con el método de pago seleccionado. Intenta de nuevo.';
+            messageDiv.className = 'message error';
+            return; // Detener la ejecución aquí
+        }
+
+        const payload = {
+            phoneNumber: formData.get('phoneNumber'),
+            proofText: formData.get('proofText'),
+            paymentOption: selectedOption
+        };
+
         fetch(`${API_URL}/transactions`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ planId: selectedPlan.id, phoneNumber, paymentOption })
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
         })
         .then(res => res.json())
-        .then(transaction => {
-            currentTransaction = transaction;
-            return fetch(`${API_URL}/transactions/${transaction.id}/proof`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ proofText })
-            });
+        .then(data => {
+            if (data.success) {
+                messageDiv.textContent = '¡Solicitud enviada! Te notificaremos cuando sea procesada.';
+                messageDiv.className = 'message success';
+                form.reset();
+            } else {
+                messageDiv.textContent = data.message || 'Ocurrió un error al enviar la solicitud.';
+                messageDiv.className = 'message error';
+            }
         })
-        .then(res => res.json())
-        .then(() => showStatusView('COMPLETED', '¡Comprobante recibido! Te notificaremos cuando se procese.'))
-        .catch(error => { console.error('Error:', error); showStatusView('FAILED', 'Hubo un error.'); })
-        .finally(() => { submitBtn.disabled = false; submitBtn.textContent = 'Enviar Comprobante'; });
+        .catch(error => {
+            console.error('Error al enviar la solicitud:', error);
+            messageDiv.textContent = 'Error de conexión. Por favor, intenta de nuevo.';
+            messageDiv.className = 'message error';
+        });
     }
 
-    function showStatusView(status, message) {
-        mainContent.innerHTML = `
-            <h2>Estado de tu Solicitud</h2>
-            <div class="message ${status === 'COMPLETED' ? 'info' : 'error'}">${message}</div>
-            <button id="btn-new-request">Hacer una nueva recarga</button>
-        `;
-        document.getElementById('btn-new-request').addEventListener('click', loadPlansView);
+    if (planId) {
+        fetch(`${API_URL}/plans/${planId}`)
+            .then(res => {
+                 // --- MEJORA: Comprobar si la respuesta es correcta antes de convertirla a JSON ---
+                if (!res.ok) {
+                    throw new Error(`Error ${res.status}: Plan no encontrado.`);
+                }
+                return res.json();
+            })
+            .then(planData => {
+                if (planData) {
+                    showPaymentForm(planData);
+                } else {
+                    mainContent.innerHTML = '<p>Plan no encontrado.</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Error al cargar el plan:', error);
+                // --- MEJORA: Mostrar un mensaje de error más claro al usuario ---
+                mainContent.innerHTML = `<p>Error: No se pudo cargar el plan solicitado. Es posible que no exista. <a href="/">Volver a la lista de planes</a></p>`;
+            });
+    } else {
+        showPlansList();
     }
 });

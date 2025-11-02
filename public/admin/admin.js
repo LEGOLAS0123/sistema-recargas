@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // IMPORTANTE: Reemplaza esta URL con la de tu aplicación en Render
-    const API_URL = 'https://sistema-recargas.onrender.com/api'; 
+    const API_URL = 'https://sistema-recargas.onrender.com/api'; // <-- CAMBIAR ESTO PARA RENDER
     const mainContent = document.getElementById('main-content');
     let eventSource;
 
@@ -44,10 +43,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showDashboard() {
         document.getElementById('btn-logout').style.display = 'block';
+        const supportBtn = document.getElementById('btn-support');
+        if (supportBtn) {
+            supportBtn.style.display = 'inline-flex';
+            supportBtn.href = `https://wa.me/19896216522`;
+        }
         mainContent.innerHTML = `
             <nav>
                 <button id="nav-transactions" class="active">Transacciones</button>
                 <button id="nav-plans">Gestionar Planes</button>
+                <button id="nav-stats">Estadísticas</button>
             </nav>
             <div id="dashboard-content"></div>
         `;
@@ -59,10 +64,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         document.getElementById('nav-transactions').addEventListener('click', () => {
-            document.getElementById('notification-badge').style.display = 'none';
+            const badge = document.getElementById('notification-badge');
+            if (badge) { badge.style.display = 'none'; }
             showTransactionsView();
         });
         document.getElementById('nav-plans').addEventListener('click', showPlansView);
+        document.getElementById('nav-stats').addEventListener('click', showStatsView);
         document.getElementById('btn-logout').addEventListener('click', () => {
             if(eventSource) eventSource.close();
             localStorage.removeItem('adminLoggedIn');
@@ -72,25 +79,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startNotifications() {
-        if (eventSource) eventSource.close();
-        eventSource = new EventSource(`${API_URL}/admin/notifications-stream`);
-        eventSource.onmessage = function(event) {
-            const notification = JSON.parse(event.data);
-            if (Notification.permission === 'granted') {
-                new Notification('Nueva Actividad', {
-                    body: notification.payload.status === 'PENDING_PAYMENT' 
-                        ? `Nueva solicitud de ${notification.payload.paymentOption.amount} ${notification.payload.paymentOption.currency}` 
-                        : `Comprobante recibido para ${notification.payload.phoneNumber}`,
-                    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">📱</text></svg>'
-                });
-            }
-            document.getElementById('notification-badge').style.display = 'inline-block';
-            if (document.getElementById('nav-transactions').classList.contains('active')) {
-                showTransactionsView();
-            }
-        };
-        eventSource.onerror = function(err) { console.error("Error en EventSource:", err); eventSource.close(); setTimeout(startNotifications, 5000); };
-    }
+    if (eventSource) eventSource.close();
+    eventSource = new EventSource(`${API_URL}/admin/notifications-stream`);
+    eventSource.onmessage = function(event) {
+        const notification = JSON.parse(event.data);
+        if (notification.type === 'connected') { return; }
+        if (Notification.permission === 'granted') {
+            new Notification('Nueva Actividad', {
+                body: `Comprobante recibido para ${notification.payload.phoneNumber}`,
+                icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">📱</text></svg>'
+            });
+        }
+        
+        // --- CORRECCIÓN PARA EL SONIDO ---
+        const sound = new Audio('/admin/notification.mp3');
+        const playPromise = sound.play();
+        
+        if (playPromise !== undefined) {
+            playPromise.catch(error => console.error("Error al reproducir el sonido:", error));
+        }
+        
+        const badge = document.getElementById('notification-badge');
+        if (badge) {
+            badge.style.display = 'inline-block';
+        }
+        if (document.getElementById('nav-transactions').classList.contains('active')) {
+            showTransactionsView();
+        }
+    };
+    eventSource.onerror = function(err) { console.error("Error en EventSource:", err); eventSource.close(); setTimeout(startNotifications, 5000); };
+}
 
     function showTransactionsView() {
         setActiveNav('nav-transactions');
@@ -140,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function loadPlansList() {
         fetch(`${API_URL}/admin/plans`).then(res => res.json()).then(plans => {
             const container = document.getElementById('plans-list-container');
-            container.innerHTML = ''; // Limpiar contenido anterior
+            container.innerHTML = '';
             if (plans.length === 0) { container.innerHTML = '<p>No hay planes creados.</p>'; return; }
             let listElement = document.createElement('ul');
             listElement.className = 'dynamic-list';
@@ -230,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <option value="PayPal" ${optionData.method === 'PayPal' ? 'selected' : ''}>PayPal</option>
                     <option value="Transferencia Bancaria" ${optionData.method === 'Transferencia Bancaria' ? 'selected' : ''}>Transferencia Bancaria</option>
                     <option value="Zelle" ${optionData.method === 'Zelle' ? 'selected' : ''}>Zelle</option>
-                    <option value="USDT" ${optionData.method === 'USDT' ? 'selected' : ''}>USDT (BEP-20)</option>
+                    <option value="USDT" ${optionData.method === 'USDT' ? 'selected' : ''}>USDT (TRC-20)</option>
                 </select>
             </div>
             <div class="form-group">
@@ -250,7 +268,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <input type="url" name="payment-link" class="payment-link" value="${optionData.link || ''}">
             </div>
 
-            <!-- CAMPO UNIVERSAL PARA INSTRUCCIONES DE DESTINO -->
             <div class="form-group">
                 <label>Instrucciones de Destino</label>
                 <textarea name="payment-destination" class="payment-destination" rows="3" placeholder="Ej: Número de cuenta: 123456789. Titular: Tu Nombre. Banco: Tu Banco.">${optionData.destinationDetails || ''}</textarea>
@@ -312,5 +329,50 @@ document.addEventListener('DOMContentLoaded', () => {
     function setActiveNav(activeId) {
         document.querySelectorAll('nav button').forEach(btn => btn.classList.remove('active'));
         document.getElementById(activeId).classList.add('active');
+    }
+
+    function showStatsView() {
+        setActiveNav('nav-stats');
+        const content = document.getElementById('dashboard-content');
+        content.innerHTML = '<h2>Estadísticas del Negocio</h2><p>Cargando datos...</p>';
+
+        fetch(`${API_URL}/admin/stats`)
+            .then(res => res.json())
+            .then(stats => {
+                let html = `
+                    <div class="stats-container">
+                        <div class="stat-card">
+                            <h3>Ingresos Totales</h3>
+                            <p class="stat-number">$${stats.totalRevenue.toFixed(2)}</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Recargas Completadas</h3>
+                            <p class="stat-number">${stats.totalTransactions}</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Recargas Pendientes</h3>
+                            <p class="stat-number">${stats.pendingTransactions}</p>
+                        </div>
+                    </div>
+                    <div class="stats-details">
+                        <h3>Ingresos por Método de Pago</h3>
+                        <ul>
+                `;
+
+                for (const method in stats.revenueByMethod) {
+                    html += `<li><strong>${method}:</strong> $${stats.revenueByMethod[method].toFixed(2)}</li>`;
+                }
+
+                if (Object.keys(stats.revenueByMethod).length === 0) {
+                    html += `<li>No hay ingresos registrados aún.</li>`;
+                }
+
+                html += `</ul></div>`;
+                content.innerHTML = html;
+            })
+            .catch(error => {
+                console.error('Error al cargar estadísticas:', error);
+                content.innerHTML = '<p>Error al cargar las estadísticas.</p>';
+            });
     }
 });
