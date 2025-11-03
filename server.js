@@ -58,7 +58,11 @@ const pool = new Pool({
 app.get('/api/plans', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM plans ORDER BY name ASC');
-    const plans = rows.map(r => ({ ...r, paymentOptions: JSON.parse(r.paymentOptions) }));
+    const plans = rows.map(r => {
+      let paymentOptions = [];
+      try { paymentOptions = JSON.parse(r.paymentOptions); } catch { paymentOptions = []; }
+      return { ...r, paymentOptions };
+    });
     res.json(plans);
   } catch (err) {
     console.error('Error obteniendo planes:', err.message);
@@ -72,7 +76,9 @@ app.get('/api/plans/:id', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM plans WHERE id=$1', [id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Plan no encontrado' });
-    res.json({ ...rows[0], paymentOptions: JSON.parse(rows[0].paymentOptions) });
+    let paymentOptions = [];
+    try { paymentOptions = JSON.parse(rows[0].paymentOptions); } catch { paymentOptions = []; }
+    res.json({ ...rows[0], paymentOptions });
   } catch (err) {
     console.error('Error obteniendo plan:', err.message);
     res.status(500).json({ error: err.message });
@@ -83,7 +89,11 @@ app.get('/api/plans/:id', async (req, res) => {
 app.get('/api/admin/plans', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM plans ORDER BY name ASC');
-    const plans = rows.map(r => ({ ...r, paymentOptions: JSON.parse(r.paymentOptions) }));
+    const plans = rows.map(r => {
+      let paymentOptions = [];
+      try { paymentOptions = JSON.parse(r.paymentOptions); } catch { paymentOptions = []; }
+      return { ...r, paymentOptions };
+    });
     res.json(plans);
   } catch (err) {
     console.error('Error obteniendo planes admin:', err.message);
